@@ -59,7 +59,7 @@ def getCurrentPrice(ticker):
     float: The current price of the stock.
     '''
     # Replace 'demo' with your API key
-    url = f'https://financialmodelingprep.com/api/v3/quote/{ticker}?apikey=W8owNfMTO2mPoobwWBxqJY7NZulcXqOl'
+    url = f'https://financialmodelingprep.com/api/v3/quote/{ticker}?apikey=demo'
     response = requests.get(url)
     data = response.json()
 
