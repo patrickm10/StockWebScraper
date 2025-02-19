@@ -2,94 +2,156 @@ from bs4 import BeautifulSoup
 import csv
 import pandas as pd
 import requests
-import time
+import logging
 
+# Initialize Logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(message)s')
+file_handler = logging.FileHandler('job_scraper.log')
 
-def getStockInfo():
+def scrapeOpenInsider():
     """
-    Get the stock information for the day.
-
-    Returns:
-    str: The stock information for the day.
+    Scrapes the OpenInsider website for the latest insider trading data.
+        Args:
+            None
+        Returns:
+            data: A dataframe containing the scraped data
     """
-    print("---------------------Stock Information---------------------\n")
-    # Read the CSV file into a DataFrame
-    stock_info = pd.read_csv('StockWebScraper/CEO_Stocks.csv')
-
-    # Remove the dollar sign and comma from the 'Price' and 'Qty' columns and convert them to float
-    stock_info['Price'] = stock_info['Price'].replace({'\$': '', ',': ''}, regex=True).astype(float)
-    stock_info['Qty'] = stock_info['Qty'].replace({'\+': '', ',': ''}, regex=True).astype(float)
-
-    # Calculate the total stock value for each person
-    stock_info['Total_Value'] = stock_info['Price'] * stock_info['Qty']
-    
-    
-    # TODO: Fix the current_price so that it checks the api for the current price of the stock.
-    # and updates the current price in the csv file.
-    
-    # current_price = getCurrentPrice(stock_info['Ticker'])
-    # print(current_price)
-    # Get the current price for each ticker
-    # stock_info['Current_Price'] = stock_info['Ticker'].apply(getCurrentPrice)
-    
-    
-    # Group by 'Insider Name' and aggregate 'Total Value', 'Ticker', and 'Price'
-    grouped = stock_info.groupby('Insider_Name').agg({
-    'Total_Value': 'sum', 
-    'Ticker': lambda x: list(x.unique()), 
-    'Price': 'mean'
-    # 'Current_Price': 'mean'
-    })
-    
-    # Create a new DataFrame from the grouped data
-    ind_stocks = pd.DataFrame(grouped)
-
-    # Write the new DataFrame to a CSV file
-    ind_stocks.to_csv('StockWebScraper/Individual_Stocks.csv')
-    print(ind_stocks)
-    print()
-    print("**********************************************************************************************\n")
-    
-def getCurrentPrice(ticker):
-    '''
-    Get the current price of a stock.
-    Parameters:
-    ticker (str): The ticker symbol of the stock.
-    Returns:
-    float: The current price of the stock.
-    '''
-    # Replace 'demo' with your API key
-    url = f'https://financialmodelingprep.com/api/v3/quote/{ticker}?apikey=demo'
+    url = "http://openinsider.com/screener?s=&o=&pl=&ph=&ll=&lh=&fd=730&fdr=&td=0&tdr=&fdlyl=&fdlyh=&daysago=&xp=1&vl=&vh=&ocl=&och=&sic1=-1&sicl=100&sich=9999&isceo=1&ispres=1&isvp=1&grp=0&nfl=&nfh=&nil=&nih=&nol=&noh=&v2l=&v2h=&oc2l=&oc2h=&sortcol=0&cnt=100&page=1"
     response = requests.get(url)
-    data = response.json()
+    soup = BeautifulSoup(response.content, "html.parser")
 
-    if data:
-        return data[0]['price']
-    else:
-        print(f"No data found for ticker {ticker}")
-        return 0
+    table = soup.find("table", {"class": "tinytable"})
+    rows = table.find_all("tr")
+
+    data = []
+
+    # Extract the table headers
+    headers = [header.text for header in rows[0].find_all("th")]
+    print(headers) # Debugging
+
+    # Extract the data from the table
+    for row in rows[1:]:
+        cols = row.find_all("td")
+        cols = [ele.text.strip() for ele in cols]
+        data.append(cols)
+
+    # Create a DataFrame
+    df = pd.DataFrame(data, columns=headers)
+    
+    return df
 
 
-def scrapeWebsite(url):
-    '''
-    Scrape the website for the stock information.
-    Parameters:
-    url (str): The url of the website to scrape.
-    '''
-    if url is None:
-        print("Invalid URL \n")
-        return None
-    else:
-        print("URL is valid \n")
-        page = requests.get(url)
-        soup = BeautifulSoup(page.content, "html.parser")
-        for row in soup.find_all("tr"):
-            cells = [cell.text for cell in row.find_all("td")]
-            # print(', '.join(cells))
-            print
-            writer.writerow(cells)
+def scrapeNvda():
+    """
+    Scrapes open insider for the latest insider trading data for NVDA.
+        Args:
+            None
+        Returns:
+            data: A dataframe containing the scraped data
+    """
+    url = "http://openinsider.com/screener?s=NVDA&o=&pl=&ph=&ll=&lh=&fd=730&fdr=&td=0&tdr=&fdlyl=&fdlyh=&daysago=&xp=1&xs=1&vl=&vh=&ocl=&och=&sic1=-1&sicl=100&sich=9999&isofficer=1&iscob=1&isceo=1&ispres=1&iscoo=1&iscfo=1&isgc=1&isvp=1&isdirector=1&istenpercent=1&isother=1&grp=0&nfl=&nfh=&nil=&nih=&nol=&noh=&v2l=&v2h=&oc2l=&oc2h=&sortcol=0&cnt=100&page=1"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, "html.parser")
 
-url = "http://openinsider.com/screener?s=&o=&pl=&ph=&ll=&lh=&fd=730&fdr=&td=0&tdr=&fdlyl=&fdlyh=&daysago=&xp=1&vl=&vh=&ocl=&och=&sic1=-1&sicl=100&sich=9999&isceo=1&ispres=1&isvp=1&grp=0&nfl=&nfh=&nil=&nih=&nol=&noh=&v2l=&v2h=&oc2l=&oc2h=&sortcol=0&cnt=100&page=1"
-# writer = csv.writer(open("output.csv", "w"))
-# scrapeWebsite(url)
-getStockInfo()
+    table = soup.find("table", {"class": "tinytable"})
+    rows = table.find_all("tr")
+
+    data = []
+
+    # Extract the table headers
+    headers = [header.text for header in rows[0].find_all("th")]
+    
+    
+    # Extract the data from the table
+    for row in rows[1:]:
+        cols = row.find_all("td")
+        cols = [ele.text.strip() for ele in cols]
+        data.append(cols)
+
+    # Create a DataFrame
+    df = pd.DataFrame(data, columns=headers)
+    
+    return df
+
+def get_top_insider_trades(time):
+    """
+    Get the top insider trades from OpenInsider
+        Args:
+            time: The time frame to get the trades from (Day, Week, Month)
+        Returns:
+            data: A dataframe containing the scraped data
+    """
+    url = "http://openinsider.com/top-insider-purchases-of-the-month"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, "html.parser")
+
+    table = soup.find("table", {"class": "tinytable"})
+    rows = table.find_all("tr")
+
+    data = []
+
+    # Extract the table headers
+    headers = [header.text for header in rows[0].find_all("th")]
+    # print(headers) # Debugging
+
+    # Extract the data from the table
+    for row in rows[1:]:
+        cols = row.find_all("td")
+        cols = [ele.text.strip() for ele in cols]
+        data.append(cols)
+
+    # Create a DataFrame
+    df = pd.DataFrame(data, columns=headers)
+
+    return df
+
+
+def sortData(table):
+    """
+    Sorts the data by the "Trade Date" and "Value" columns.
+        Args:
+            table: A data frame of the scraped data
+        Returns:
+            table: A sorted data frame
+    """
+    table = pd.DataFrame(table[1:], columns=table.columns)
+    table.iloc[:, 2] = pd.to_datetime(table.iloc[:, 2])  # Trade Date is the 3rd column (index 2)
+    table.iloc[:, 12] = table.iloc[:, 12].str.replace("$", "").str.replace(",", "").astype(float)  # Value is the 13th column (index 12)
+    table = table.sort_values(by=["Trade\xa0Date", "Value"], ascending=[False, False])
+    return table
+
+def main():
+    data = scrapeOpenInsider()
+
+    # Sort the data
+    df = pd.DataFrame(data[1:], columns=data.columns)
+    sorted_df = sortData(data)
+    sorted_df.to_csv("insider_trading.csv", index=False)
+    logger.info("Data saved to insider_trading.csv")
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    print(df)
+
+    data.to_csv("insider_trading_sorted.csv", index=False)
+    logger.info("Data saved to insider_trading_sorted.csv\n")
+
+    # scrape NVDA data
+    # nvda_data = scrapeNvda()
+    # nvda_df = pd.DataFrame(nvda_data[1:], columns=nvda_data[0])
+    # nvda_df.to_csv("nvda_insider_trading.csv", index=False)
+    # logger.info("NVDA data saved to nvda_insider_trading.csv")
+    # print(nvda_df)
+
+    # Get the top insider trades
+    top_trades = get_top_insider_trades("month")
+    top_trades.to_csv("top_insider_trades_feb.csv", index=False)
+
+
+
+
+
+
+if __name__ == "__main__":
+    main()
